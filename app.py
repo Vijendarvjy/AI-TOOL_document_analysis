@@ -543,22 +543,21 @@ if st.button("🚀 Analyze Document", use_container_width=True):
         unsafe_allow_html=True
     )
 
-    # ========================================================
-    # AGENT ANALYSIS RESULTS
-    # ========================================================
+ # ============================================================
+# DISPLAY AGENT RESULTS
+# ============================================================
 
-    st.markdown("---")
-    st.subheader("🤖 Agent Risk Analysis")
+st.markdown("---")
+st.subheader("🤖 Agent Risk Analysis")
 
-    col1, col2 = st.columns(2)
+col1, col2 = st.columns(2)
 
-    agent_items = list(result["results"].items())
+agent_items = list(result["results"].items())
 
-    for index, (agent_name, agent_data) in enumerate(agent_items):
-        if index % 2 == 0:
-            with col1:
-                display_risk_card(agent_name, agent_data)
-        else:
-            with col2:
-                display_risk_card(agent_name, agent_data)0 else col2:
-            display_risk_card(agent, data)
+for index, (agent_name, agent_data) in enumerate(agent_items):
+    if index % 2 == 0:
+        with col1:
+            display_risk_card(agent_name, agent_data)
+    else:
+        with col2:
+            display_risk_card(agent_name, agent_data)
