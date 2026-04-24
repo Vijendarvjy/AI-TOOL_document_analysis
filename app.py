@@ -11,7 +11,12 @@ from typing import TypedDict, Dict, Any
 # ---------- Required Libraries ----------
 
 from PIL import Image
-from PyPDF2 import PdfReader
+# Robust PDF Import (supports both libraries)
+
+try:
+    from pypdf import PdfReader
+except ImportError:
+    from PyPDF2 import PdfReader
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_groq import ChatGroq
