@@ -430,7 +430,28 @@ if st.button("🚀 Analyze Document", use_container_width=True):
             st.error("No readable content found.")
             st.stop()
 
-        llm = load_llm()
+       # ============================================================
+# LOAD LLM SAFELY
+# ============================================================
+
+@st.cache_resource
+def load_llm():
+    if not GROQ_CHAIN_AVAILABLE:
+        st.error(
+            """
+langchain-groq is not installed.
+
+Add this to requirements.txt:
+langchain-groq
+            """
+        )
+        st.stop()
+
+    return ChatGroq(
+        groq_api_key=GROQ_API_KEY,
+        model_name=MODEL_NAME,
+        temperature=0
+    )
 
         vector_store = build_vector_store(document_text)
         retriever = vector_store.as_retriever(
