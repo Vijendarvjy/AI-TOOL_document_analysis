@@ -1,24 +1,34 @@
 import streamlit as st
-import os
-import tempfile
-import pytesseract
+import json
+from typing import TypedDict, Dict, Any
+
+# ============================================================
+# OPTIONAL IMPORTS (SAFE FOR STREAMLIT CLOUD)
+# ============================================================
+
+try:
+    import pytesseract
+    OCR_AVAILABLE = True
+except ModuleNotFoundError:
+    OCR_AVAILABLE = False
+
+try:
+    from pdf2image import convert_from_bytes
+    PDF_IMAGE_AVAILABLE = True
+except ModuleNotFoundError:
+    PDF_IMAGE_AVAILABLE = False
+
 from PIL import Image
-from pdf2image import convert_from_bytes
 from docx import Document
 from pypdf import PdfReader
-from groq import Groq
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.schema import Document as LangDocument
+from langchain_groq import ChatGroq
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
 
 from langgraph.graph import StateGraph, END
-from typing import TypedDict, Dict, Any
-import json
-import re
 
 # ============================================================
 # PAGE CONFIG
@@ -37,25 +47,30 @@ st.set_page_config(
 st.sidebar.title("⚙️ Configuration")
 
 groq_api_key = st.sidebar.text_input(
-    "Enter Groq API Key",
+    "Groq API Key",
     type="password"
 )
 
 model_name = st.sidebar.selectbox(
-    "Choose Model",
+    "Select Model",
     [
-        "meta-llama/llama-prompt-guard-2-22m",
-        "meta-llama/llama-prompt-guard-2-86m",
-        "meta-llama/llama-4-scout-17b-16e-instruct"
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768"
     ]
 )
 
+if not OCR_AVAILABLE:
+    st.sidebar.warning(
+        "⚠️ pytesseract not installed. Image OCR disabled."
+    )
+
 # ============================================================
-# INITIALIZE LLM
+# LLM
 # ============================================================
 
 @st.cache_resource
-def initialize_llm(api_key, model):
+def load_llm(api_key, model):
     return ChatGroq(
         groq_api_key=api_key,
         model_name=model,
@@ -63,7 +78,7 @@ def initialize_llm(api_key, model):
     )
 
 # ============================================================
-# DOCUMENT LOADERS
+# DOCUMENT EXTRACTION
 # ============================================================
 
 def extract_text_from_pdf(file):
@@ -71,16 +86,18 @@ def extract_text_from_pdf(file):
     text = ""
 
     for page in reader.pages:
-        extracted = page.extract_text()
-        if extracted:
-            text += extracted + "\n"
+        content = page.extract_text()
+        if content:
+            text += content + "\n"
 
     return text
 
 
 def extract_text_from_docx(file):
     doc = Document(file)
-    return "\n".join([p.text for p in doc.paragraphs])
+    return "\n".join(
+        paragraph.text for paragraph in doc.paragraphs
+    )
 
 
 def extract_text_from_txt(file):
@@ -88,41 +105,53 @@ def extract_text_from_txt(file):
 
 
 def extract_text_from_image(file):
+    if not OCR_AVAILABLE:
+        return "OCR not available. Install pytesseract."
+
     image = Image.open(file)
     return pytesseract.image_to_string(image)
 
 
 def extract_text_from_scanned_pdf(file):
+    if not OCR_AVAILABLE or not PDF_IMAGE_AVAILABLE:
+        return (
+            "Scanned PDF OCR unavailable.\n"
+            "Install pytesseract and pdf2image."
+        )
+
     images = convert_from_bytes(file.read())
     text = ""
 
-    for img in images:
-        text += pytesseract.image_to_string(img) + "\n"
+    for image in images:
+        text += pytesseract.image_to_string(image) + "\n"
 
     return text
 
 
 def process_uploaded_file(uploaded_file):
-    ext = uploaded_file.name.split(".")[-1].lower()
+    extension = uploaded_file.name.split(".")[-1].lower()
 
-    if ext == "pdf":
+    if extension == "pdf":
         try:
             text = extract_text_from_pdf(uploaded_file)
+
             if len(text.strip()) < 50:
                 uploaded_file.seek(0)
                 text = extract_text_from_scanned_pdf(uploaded_file)
+
             return text
-        except:
+
+        except Exception:
             uploaded_file.seek(0)
             return extract_text_from_scanned_pdf(uploaded_file)
 
-    elif ext == "docx":
+    elif extension == "docx":
         return extract_text_from_docx(uploaded_file)
 
-    elif ext == "txt":
+    elif extension == "txt":
         return extract_text_from_txt(uploaded_file)
 
-    elif ext in ["png", "jpg", "jpeg"]:
+    elif extension in ["png", "jpg", "jpeg"]:
         return extract_text_from_image(uploaded_file)
 
     return ""
@@ -144,47 +173,49 @@ def build_vector_store(text):
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
 
-    db = Chroma.from_documents(
+    return Chroma.from_documents(
         docs,
-        embedding=embeddings
+        embeddings
     )
 
-    return db
-
 # ============================================================
-# AGENT PROMPTS
+# AGENTS
 # ============================================================
 
 AGENTS = {
     "Legal Agent": """
-        Analyze legal risks, liabilities, clauses, litigation exposure,
-        obligations, penalties, indemnities, and enforceability.
-        Return JSON:
-        {
-            "risk_score": number,
-            "risk_level": "Low/Medium/High/Critical",
-            "findings": [],
-            "recommendations": []
-        }
-    """,
+Analyze legal risks, liabilities, contracts, penalties,
+indemnities, and litigation exposure.
+
+Return valid JSON:
+{
+    "risk_score": 0-100,
+    "risk_level": "Low/Medium/High/Critical",
+    "findings": ["point1", "point2"],
+    "recommendations": ["action1", "action2"]
+}
+""",
 
     "Finance Agent": """
-        Analyze financial risks, losses, cashflow exposure,
-        hidden costs, penalties, pricing issues.
-        Return JSON.
-    """,
+Analyze financial exposure, hidden costs,
+cashflow risks, penalties, and pricing issues.
+
+Return valid JSON.
+""",
 
     "Compliance Agent": """
-        Analyze regulatory, policy, audit, GDPR, HIPAA,
-        SOX, AML, and governance compliance risks.
-        Return JSON.
-    """,
+Analyze regulatory compliance, audit readiness,
+GDPR, HIPAA, SOX, AML, and policy violations.
+
+Return valid JSON.
+""",
 
     "Operations Agent": """
-        Analyze operational bottlenecks, delivery risks,
-        SLA risks, vendor dependency, scalability issues.
-        Return JSON.
-    """
+Analyze operational bottlenecks, vendor dependency,
+SLA risks, delivery risks, and scalability.
+
+Return valid JSON.
+"""
 }
 
 # ============================================================
@@ -192,121 +223,138 @@ AGENTS = {
 # ============================================================
 
 class GraphState(TypedDict):
-    query: str
+    document_text: str
     results: Dict[str, Any]
 
 # ============================================================
-# CREATE AGENT NODE
+# AGENT NODE
 # ============================================================
 
 def create_agent_node(agent_name, llm, retriever):
-    def agent(state):
+
+    def node(state):
         qa = RetrievalQA.from_chain_type(
             llm=llm,
             retriever=retriever
         )
 
         prompt = f"""
-        {AGENTS[agent_name]}
+{AGENTS[agent_name]}
 
-        Document Analysis:
-        {state['query']}
-        """
+Document Content:
+{state["document_text"][:12000]}
+"""
 
         response = qa.run(prompt)
 
         try:
-            parsed = json.loads(response)
-        except:
-            parsed = {
+            cleaned = response.strip()
+
+            if cleaned.startswith("```json"):
+                cleaned = cleaned.replace("```json", "")
+                cleaned = cleaned.replace("```", "")
+
+            result = json.loads(cleaned)
+
+        except Exception:
+            result = {
                 "risk_score": 50,
                 "risk_level": "Medium",
                 "findings": [response],
-                "recommendations": []
+                "recommendations": [
+                    "Manual review recommended."
+                ]
             }
 
-        state["results"][agent_name] = parsed
+        state["results"][agent_name] = result
         return state
 
-    return agent
+    return node
 
 # ============================================================
-# BUILD LANGGRAPH
+# BUILD GRAPH
 # ============================================================
 
 def build_graph(llm, retriever):
     workflow = StateGraph(GraphState)
 
-    for agent_name in AGENTS:
+    agent_names = list(AGENTS.keys())
+
+    for agent in agent_names:
         workflow.add_node(
-            agent_name,
-            create_agent_node(agent_name, llm, retriever)
+            agent,
+            create_agent_node(agent, llm, retriever)
         )
 
-    workflow.set_entry_point("Legal Agent")
+    workflow.set_entry_point(agent_names[0])
 
-    workflow.add_edge("Legal Agent", "Finance Agent")
-    workflow.add_edge("Finance Agent", "Compliance Agent")
-    workflow.add_edge("Compliance Agent", "Operations Agent")
-    workflow.add_edge("Operations Agent", END)
+    for i in range(len(agent_names) - 1):
+        workflow.add_edge(
+            agent_names[i],
+            agent_names[i + 1]
+        )
+
+    workflow.add_edge(agent_names[-1], END)
 
     return workflow.compile()
 
 # ============================================================
-# RISK COLOR
+# UI HELPERS
 # ============================================================
 
 def get_risk_color(score):
     if score < 30:
-        return "green"
+        return "#00C853"
     elif score < 60:
-        return "orange"
+        return "#FF9800"
     elif score < 80:
-        return "red"
-    return "darkred"
+        return "#F44336"
+    return "#B71C1C"
 
-# ============================================================
-# DISPLAY CARD
-# ============================================================
 
 def display_risk_card(agent, result):
     score = result.get("risk_score", 0)
     level = result.get("risk_level", "Unknown")
-    findings = result.get("findings", [])
-    recommendations = result.get("recommendations", [])
 
     color = get_risk_color(score)
 
-    st.markdown(f"""
-    <div style="
-        background:#111;
-        padding:20px;
-        border-radius:15px;
-        border-left:8px solid {color};
-        margin-bottom:20px;
-    ">
-        <h3 style="color:white;">{agent}</h3>
-        <h1 style="color:{color};">{score}%</h1>
-        <h4 style="color:white;">{level} Risk</h4>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div style="
+            background:#111827;
+            padding:25px;
+            border-radius:18px;
+            border-left:8px solid {color};
+            margin-bottom:20px;
+            box-shadow:0 8px 20px rgba(0,0,0,0.3);
+        ">
+            <h3 style="color:white;">{agent}</h3>
+            <h1 style="color:{color};">{score}%</h1>
+            <h4 style="color:#E5E7EB;">{level} Risk</h4>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    with st.expander(f"View {agent} Details"):
-        st.write("### Findings")
-        for item in findings:
-            st.write(f"- {item}")
+    with st.expander(f"View {agent} Analysis"):
+        st.subheader("Key Findings")
+        for finding in result.get("findings", []):
+            st.write(f"• {finding}")
 
-        st.write("### Recommendations")
-        for item in recommendations:
-            st.write(f"- {item}")
+        st.subheader("Recommendations")
+        for rec in result.get("recommendations", []):
+            st.write(f"• {rec}")
 
 # ============================================================
-# MAIN UI
+# MAIN APP
 # ============================================================
 
 st.title("📄 AI Enterprise Document Risk Analyzer")
 st.markdown(
-    "Analyze Legal, Financial, Compliance, and Operational risks using AI."
+    """
+Analyze Legal, Financial, Compliance, and Operational
+risks using Groq, LangChain, LangGraph, and RAG.
+"""
 )
 
 uploaded_file = st.file_uploader(
@@ -315,30 +363,37 @@ uploaded_file = st.file_uploader(
 )
 
 manual_text = st.text_area(
-    "Or Paste Document Content",
-    height=200
+    "Or Paste Document Text",
+    height=250
 )
 
-if st.button("🚀 Analyze Document"):
+if st.button("🚀 Analyze Document", use_container_width=True):
 
     if not groq_api_key:
-        st.error("Please enter Groq API Key.")
+        st.error("Please enter your Groq API Key.")
         st.stop()
 
-    if not uploaded_file and not manual_text:
+    if not uploaded_file and not manual_text.strip():
         st.warning("Upload a file or paste text.")
         st.stop()
 
-    with st.spinner("Processing document..."):
+    with st.spinner("Analyzing document..."):
 
         if uploaded_file:
-            text = process_uploaded_file(uploaded_file)
+            document_text = process_uploaded_file(uploaded_file)
         else:
-            text = manual_text
+            document_text = manual_text
 
-        llm = initialize_llm(groq_api_key, model_name)
+        if not document_text.strip():
+            st.error("No readable text found.")
+            st.stop()
 
-        vector_store = build_vector_store(text)
+        llm = load_llm(
+            groq_api_key,
+            model_name
+        )
+
+        vector_store = build_vector_store(document_text)
         retriever = vector_store.as_retriever(
             search_kwargs={"k": 4}
         )
@@ -346,44 +401,51 @@ if st.button("🚀 Analyze Document"):
         graph = build_graph(llm, retriever)
 
         result = graph.invoke({
-            "query": text[:12000],
+            "document_text": document_text,
             "results": {}
         })
 
-        st.success("Analysis Completed!")
+    st.success("Analysis Completed Successfully!")
 
-        # Overall Summary
-        all_scores = [
-            v["risk_score"]
-            for v in result["results"].values()
-        ]
+    # Overall Risk
+    scores = [
+        data.get("risk_score", 0)
+        for data in result["results"].values()
+    ]
 
-        overall_risk = sum(all_scores) / len(all_scores)
+    overall_risk = sum(scores) / len(scores)
+    overall_color = get_risk_color(overall_risk)
 
-        st.markdown("---")
-        st.subheader("📊 Overall Risk Score")
+    st.markdown("---")
+    st.subheader("📊 Overall Enterprise Risk")
 
-        overall_color = get_risk_color(overall_risk)
-
-        st.markdown(f"""
+    st.markdown(
+        f"""
         <div style="
             text-align:center;
-            padding:30px;
-            background:#000;
+            padding:35px;
             border-radius:20px;
-            border:3px solid {overall_color};
+            background:#000;
+            border:4px solid {overall_color};
+            margin-bottom:30px;
         ">
-            <h1 style="color:{overall_color};">
+            <h1 style="
+                font-size:60px;
+                color:{overall_color};
+                margin:0;
+            ">
                 {overall_risk:.1f}%
             </h1>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+        unsafe_allow_html=True
+    )
 
-        st.markdown("---")
+    # Agent Cards
+    col1, col2 = st.columns(2)
 
-        # Agent Results
-        cols = st.columns(2)
+    agents = list(result["results"].items())
 
-        for idx, (agent, data) in enumerate(result["results"].items()):
-            with cols[idx % 2]:
-                display_risk_card(agent, data)
+    for i, (agent, data) in enumerate(agents):
+        with col1 if i % 2 == 0 else col2:
+            display_risk_card(agent, data)
