@@ -10,6 +10,7 @@ langgraph
 chromadb
 sentence-transformers
 
+pypdf
 PyPDF2
 python-docx
 
