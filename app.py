@@ -44,9 +44,9 @@ groq_api_key = st.sidebar.text_input(
 model_name = st.sidebar.selectbox(
     "Choose Model",
     [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768"
+        "meta-llama/llama-prompt-guard-2-22m",
+        "meta-llama/llama-prompt-guard-2-86m",
+        "meta-llama/llama-4-scout-17b-16e-instruct"
     ]
 )
 
