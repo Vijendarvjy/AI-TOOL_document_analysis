@@ -67,12 +67,35 @@ except ImportError:
         PDF_LIBRARY = None
 from PIL import Image
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_groq import ChatGroq
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.chains import RetrievalQA
-from langgraph.graph import StateGraph, END
+# ============================================================
+# LANGCHAIN IMPORTS (SAFE)
+# ============================================================
+
+try:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain.chains import RetrievalQA
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
+
+try:
+    from langchain_groq import ChatGroq
+    GROQ_CHAIN_AVAILABLE = True
+except ImportError:
+    GROQ_CHAIN_AVAILABLE = False
+
+try:
+    from langchain_community.vectorstores import Chroma
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    VECTOR_DB_AVAILABLE = True
+except ImportError:
+    VECTOR_DB_AVAILABLE = False
+
+try:
+    from langgraph.graph import StateGraph, END
+    LANGGRAPH_AVAILABLE = True
+except ImportError:
+    LANGGRAPH_AVAILABLE = False
 
 # ============================================================
 # SIDEBAR
