@@ -2,10 +2,6 @@ streamlit
 groq
 
 langchain
-langchain-corestreamlit
-groq
-
-langchain
 langchain-core
 langchain-community
 langchain-groq
@@ -15,26 +11,6 @@ chromadb
 sentence-transformers
 
 PyPDF2
-python-docx
-
-Pillow
-pytesseract
-pdf2image
-
-unstructured
-python-multipart
-typing-extensions
-
-torch
-transformers
-langchain-community
-langchain-groq
-langgraph
-
-chromadb
-sentence-transformers
-
-pypdf
 python-docx
 
 Pillow
