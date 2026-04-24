@@ -5,17 +5,13 @@ langchain-core
 langchain-community
 langchain-groq
 langgraph
-
 chromadb
 sentence-transformers
-
 pypdf
 python-docx
-
 Pillow
 pytesseract
 pdf2image
-
 unstructured
 python-multipart
 typing-extensions
