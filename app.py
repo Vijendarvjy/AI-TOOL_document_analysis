@@ -1,21 +1,24 @@
+# ============================================================
+# SAFE OPTIONAL IMPORTS
+# Replace ALL top-level imports with this block
+# ============================================================
+
+# ---------- Optional Libraries ----------
 import streamlit as st
 import json
 from typing import TypedDict, Dict, Any
+
+# ---------- Required Libraries ----------
+
 from PIL import Image
-from docx import Document
 from pypdf import PdfReader
+
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_groq import ChatGroq
 from langchain_community.vectorstores import Chroma
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 from langgraph.graph import StateGraph, END
-
-
-# ============================================================
-# OPTIONAL IMPORTS (STREAMLIT CLOUD SAFE)
-# ============================================================
-
 try:
     from docx import Document
     DOCX_AVAILABLE = True
