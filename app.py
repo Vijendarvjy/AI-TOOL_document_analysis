@@ -430,50 +430,93 @@ if st.button("🚀 Analyze Document", use_container_width=True):
             st.error("No readable content found.")
             st.stop()
 
-       # ============================================================
-# LOAD LLM SAFELY
+# ============================================================
+# MAIN EXECUTION BLOCK
 # ============================================================
 
-@st.cache_resource
-def load_llm():
-    if not GROQ_CHAIN_AVAILABLE:
-        st.error(
-            """
-langchain-groq is not installed.
+if st.button("🚀 Analyze Document", use_container_width=True):
 
-Add this to requirements.txt:
-langchain-groq
-            """
-        )
+    # Validate Input
+    if uploaded_file is None and not manual_text.strip():
+        st.warning("⚠️ Please upload a document or paste text.")
         st.stop()
 
-    return ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=MODEL_NAME,
-        temperature=0
-    )
+    with st.spinner("🔍 Analyzing document..."):
 
+        # ----------------------------------------------------
+        # Extract Document Text
+        # ----------------------------------------------------
+        if uploaded_file is not None:
+            document_text = process_uploaded_file(uploaded_file)
+        else:
+            document_text = manual_text
+
+        if not document_text.strip():
+            st.error("❌ No readable content found in the document.")
+            st.stop()
+
+        # ----------------------------------------------------
+        # Validate Required Libraries
+        # ----------------------------------------------------
+        if not LANGCHAIN_AVAILABLE:
+            st.error("langchain package is not installed.")
+            st.stop()
+
+        if not GROQ_CHAIN_AVAILABLE:
+            st.error("langchain-groq package is not installed.")
+            st.stop()
+
+        if not VECTOR_DB_AVAILABLE:
+            st.error("langchain-community or chromadb is not installed.")
+            st.stop()
+
+        if not LANGGRAPH_AVAILABLE:
+            st.error("langgraph package is not installed.")
+            st.stop()
+
+        # ----------------------------------------------------
+        # Load LLM
+        # ----------------------------------------------------
+        llm = load_llm()
+
+        # ----------------------------------------------------
+        # Build Vector Store
+        # ----------------------------------------------------
         vector_store = build_vector_store(document_text)
+
         retriever = vector_store.as_retriever(
             search_kwargs={"k": 4}
         )
 
+        # ----------------------------------------------------
+        # Build Workflow
+        # ----------------------------------------------------
         graph = build_graph(llm, retriever)
 
+        # ----------------------------------------------------
+        # Execute Analysis
+        # ----------------------------------------------------
         result = graph.invoke({
             "document_text": document_text,
             "results": {}
         })
 
-    st.success("Analysis completed successfully!")
+    st.success("✅ Analysis completed successfully!")
 
-    # Overall Risk
+    # ========================================================
+    # OVERALL RISK SCORE
+    # ========================================================
+
     scores = [
-        data.get("risk_score", 0)
-        for data in result["results"].values()
+        agent_result.get("risk_score", 0)
+        for agent_result in result["results"].values()
     ]
 
-    overall_risk = sum(scores) / len(scores)
+    overall_risk = (
+        sum(scores) / len(scores)
+        if scores else 0
+    )
+
     overall_color = get_risk_color(overall_risk)
 
     st.subheader("📊 Overall Enterprise Risk")
@@ -486,11 +529,13 @@ langchain-groq
             background:#000000;
             border-radius:25px;
             border:4px solid {overall_color};
-            margin-bottom:30px;">
+            margin-bottom:30px;
+        ">
             <h1 style="
                 color:{overall_color};
                 font-size:70px;
-                margin:0;">
+                margin:0;
+            ">
                 {overall_risk:.1f}%
             </h1>
         </div>
@@ -498,11 +543,22 @@ langchain-groq
         unsafe_allow_html=True
     )
 
-    # Agent Results
+    # ========================================================
+    # AGENT ANALYSIS RESULTS
+    # ========================================================
+
+    st.markdown("---")
+    st.subheader("🤖 Agent Risk Analysis")
+
     col1, col2 = st.columns(2)
 
-    agents = list(result["results"].items())
+    agent_items = list(result["results"].items())
 
-    for i, (agent, data) in enumerate(agents):
-        with col1 if i % 2 == 0 else col2:
+    for index, (agent_name, agent_data) in enumerate(agent_items):
+        if index % 2 == 0:
+            with col1:
+                display_risk_card(agent_name, agent_data)
+        else:
+            with col2:
+                display_risk_card(agent_name, agent_data)0 else col2:
             display_risk_card(agent, data)
