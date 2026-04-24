@@ -51,11 +51,20 @@ try:
 except ImportError:
     PDF_IMAGE_AVAILABLE = False
 
+# ------------------------------------------------------------
+# ROBUST PDF IMPORT (pypdf / PyPDF2)
+# ------------------------------------------------------------
+
 try:
     from pypdf import PdfReader
+    PDF_LIBRARY = "pypdf"
 except ImportError:
-    from PyPDF2 import PdfReader
-
+    try:
+        from PyPDF2 import PdfReader
+        PDF_LIBRARY = "PyPDF2"
+    except ImportError:
+        PdfReader = None
+        PDF_LIBRARY = None
 from PIL import Image
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
