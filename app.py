@@ -106,9 +106,9 @@ st.sidebar.title("⚙️ Settings")
 MODEL_NAME = st.sidebar.selectbox(
     "Select Groq Model",
     [
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768"
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "meta-llama/llama-prompt-guard-2-22m",
+        "meta-llama/llama-prompt-guard-2-86m"
     ]
 )
 
