@@ -1,10 +1,26 @@
 import streamlit as st
 import json
 from typing import TypedDict, Dict, Any
+from PIL import Image
+from docx import Document
+from pypdf import PdfReader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_groq import ChatGroq
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain.chains import RetrievalQA
+from langgraph.graph import StateGraph, END
+
 
 # ============================================================
-# OPTIONAL IMPORTS (SAFE FOR STREAMLIT CLOUD)
+# OPTIONAL IMPORTS (STREAMLIT CLOUD SAFE)
 # ============================================================
+
+try:
+    from docx import Document
+    DOCX_AVAILABLE = True
+except ModuleNotFoundError:
+    DOCX_AVAILABLE = False
 
 try:
     import pytesseract
@@ -17,18 +33,20 @@ try:
     PDF_IMAGE_AVAILABLE = True
 except ModuleNotFoundError:
     PDF_IMAGE_AVAILABLE = False
+# ============================================================
+# SIDEBAR WARNINGS
+# ============================================================
 
-from PIL import Image
-from docx import Document
-from pypdf import PdfReader
+if not DOCX_AVAILABLE:
+    st.sidebar.warning(
+        "⚠️ python-docx not installed. DOCX support disabled."
+    )
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_groq import ChatGroq
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.chains import RetrievalQA
+if not OCR_AVAILABLE:
+    st.sidebar.warning(
+        "⚠️ pytesseract not installed. OCR disabled."
+    )
 
-from langgraph.graph import StateGraph, END
 
 # ============================================================
 # PAGE CONFIG
