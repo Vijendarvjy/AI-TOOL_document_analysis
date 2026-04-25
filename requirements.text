@@ -1,11 +1,31 @@
+# requirements.txt
+
 streamlit==1.44.1
+
+# Core LangChain
 langchain==0.3.23
-langchain-community==0.3.21
 langchain-core==0.3.54
+langchain-community==0.3.21
+langchain-text-splitters==0.3.8
+
+# LLM Providers
+groq==0.23.1
+langchain-groq==0.3.2
+
+# Embeddings
+langchain-huggingface==0.1.2
+sentence-transformers==4.1.0
+
+# Vector Store
+faiss-cpu==1.10.0
+
+# Document Processing
 pypdf==5.4.0
 python-docx==1.1.2
-faiss-cpu==1.10.0
-sentence-transformers==4.1.0
+
+# ML Dependencies
 transformers==4.51.3
 torch==2.6.0
-groq==0.23.1
+
+# Utilities
+python-dotenv==1.1.0
