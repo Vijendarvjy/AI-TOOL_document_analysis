@@ -55,15 +55,12 @@ except:
 
 from PIL import Image
 # ============================================================
-# UNIVERSAL LANGCHAIN IMPORTS
-# Works with both old and new LangChain versions
+# REPLACE ALL LANGCHAIN IMPORTS WITH THIS BLOCK
 # ============================================================
 
 try:
-    # Latest packages
     from langchain_text_splitters import RecursiveCharacterTextSplitter
 except ImportError:
-    # Fallback for older versions
     from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 try:
@@ -79,7 +76,6 @@ except ImportError:
 from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
 from langgraph.graph import StateGraph, END
-
 
 # ============================================================
 # SIDEBAR
