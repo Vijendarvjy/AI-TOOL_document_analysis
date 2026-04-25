@@ -54,15 +54,32 @@ except:
         PdfReader = None
 
 from PIL import Image
+# ============================================================
+# UNIVERSAL LANGCHAIN IMPORTS
+# Works with both old and new LangChain versions
+# ============================================================
 
-# LangChain
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import HuggingFaceEmbeddings
+try:
+    # Latest packages
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except ImportError:
+    # Fallback for older versions
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+try:
+    from langchain_chroma import Chroma
+except ImportError:
+    from langchain_community.vectorstores import Chroma
+
+try:
+    from langchain_huggingface import HuggingFaceEmbeddings
+except ImportError:
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+
 from langchain_groq import ChatGroq
 from langchain.chains import RetrievalQA
-
 from langgraph.graph import StateGraph, END
+
 
 # ============================================================
 # SIDEBAR
