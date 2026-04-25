@@ -60,7 +60,7 @@ from PIL import Image
 
 try:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-except ImportError:
+except Exception:
     from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 try:
